@@ -1,8 +1,9 @@
-from aiogram.types import Message, TelegramObject
-from aiogram import BaseMiddleware
-from dotenv import load_dotenv
 from os import getenv
-from typing import Callable, Dict, Any, Awaitable
+from typing import Any, Awaitable, Callable, Dict
+
+from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+from dotenv import load_dotenv
 
 load_dotenv(".env")
 ADMIN_USER_ID = int(getenv("ADMIN_USER_ID"))

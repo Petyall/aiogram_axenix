@@ -1,25 +1,32 @@
-import asyncio, sys, logging, aiosqlite
-
+import asyncio
+import logging
+import sys
 from os import getenv
-from aiogram import Bot, Dispatcher, html, F
+
+from aiogram import Bot, Dispatcher, F, html
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, CallbackQuery, InlineKeyboardButton, InputMediaPhoto
-from dotenv import load_dotenv
-from typing import Dict, Any
+from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from database import connect_to_db, create_users_table, create_slides_table, create_messages_table, insert_user, insert_slide, get_slide, get_users, insert_message, get_messages, get_max_slide_id, delete_messages
-from middleware import AdminMiddleware
+from aiogram.types import (CallbackQuery, InlineKeyboardButton,
+                           InputMediaPhoto, Message)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from dotenv import load_dotenv
+
+from database import (create_messages_table, create_slides_table,
+                      create_users_table, delete_messages, get_max_slide_id,
+                      get_messages, get_slide, get_users, insert_message,
+                      insert_slide, insert_user)
+from middleware import AdminMiddleware
+
 
 load_dotenv(".env")
 TOKEN = getenv("BOT_TOKEN")
-admin_id = getenv("ADMIN_USER_ID")
 
 dp = Dispatcher()
 dp.message.middleware(AdminMiddleware())
+
 
 @dp.message(CommandStart())
 async def command_start_handler(message: Message) -> None:
@@ -27,10 +34,10 @@ async def command_start_handler(message: Message) -> None:
     await message.answer(f"Привет, {html.bold(message.from_user.full_name)}!")
 
 
-
 class AddSlideStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_description = State()
+
 
 @dp.message(Command('add_slide'))
 async def add_slide_start(message: Message, is_admin: bool, state: FSMContext):
@@ -38,11 +45,13 @@ async def add_slide_start(message: Message, is_admin: bool, state: FSMContext):
         await message.reply("Отправьте фотографию:")
         await state.set_state(AddSlideStates.waiting_for_name)
 
+
 @dp.message(AddSlideStates.waiting_for_name, F.photo)
 async def add_slide_name(message: Message, state: FSMContext):
     await state.update_data(name=message.photo[-1].file_id)
     await message.reply("Введите описание слайда:")
     await state.set_state(AddSlideStates.waiting_for_description)
+
 
 @dp.message(AddSlideStates.waiting_for_description)
 async def add_slide_description(message: Message, state: FSMContext):
@@ -51,60 +60,22 @@ async def add_slide_description(message: Message, state: FSMContext):
     description = message.text
 
     await insert_slide(name, description)
-
     await state.clear()
     await message.reply(f"Слайд успешно добавлен!{name} - {description}")
 
-# class GetSlideStates(StatesGroup):
-#     waiting_for_id = State()
 
-# @dp.message(Command('get_slide'))
-# async def get_slide_start(message: Message, is_admin: bool, state: FSMContext):
-#     # if is_admin:
-#     await message.reply("Отправьте id:")
-#     await state.set_state(GetSlideStates.waiting_for_id)
-
-# @dp.message(GetSlideStates.waiting_for_id)
-# async def get_slide_id(message: Message, state: FSMContext):
-#     slide = await get_slide(message.text)
-#     print(slide)
-#     await state.clear()
-#     await message.answer_photo(photo=slide[1])
-
-
-
-# class GetSlideStates(StatesGroup):
-#     waiting_for_id = State()
-
-# @dp.message(Command('get_slide'))
-# async def get_slide_start(message: Message, is_admin: bool, state: FSMContext):
-#     # if is_admin:
-#     await message.reply("Отправьте id:")
-#     await state.set_state(GetSlideStates.waiting_for_id)
-
-# @dp.message(GetSlideStates.waiting_for_id)
-# async def get_slide_id(message: Message, state: FSMContext, bot: Bot):
-#     slide = await get_slide(message.text)
-#     await state.clear()
-
-#     users = await get_users()
-#     for user_id in users:
-#         # print(user_id)
-#         await bot.send_photo(chat_id=user_id, photo=slide[1])
-#     # await message.answer_photo(photo=slide[1])
-
-
-
-
+admin_id = getenv("ADMIN_USER_ID")
 
 class GetSlideStates(StatesGroup):
     waiting_for_id = State()
+
 
 @dp.message(Command('get_slide'))
 async def get_slide_start(message: Message, is_admin: bool, state: FSMContext):
     if is_admin:
         await message.reply("Отправьте id:")
         await state.set_state(GetSlideStates.waiting_for_id)
+
 
 @dp.message(GetSlideStates.waiting_for_id)
 async def get_slide_id(message: Message, state: FSMContext, bot: Bot):
@@ -118,6 +89,7 @@ async def get_slide_id(message: Message, state: FSMContext, bot: Bot):
     )
 
     users = await get_users()
+
     for user_id in users:
         if user_id == int(admin_id):
             message = await bot.send_photo(chat_id=user_id, photo=slide[1], reply_markup=builder.as_markup(), caption=slide[2])
@@ -155,8 +127,7 @@ async def send_next_slide(callback: CallbackQuery, bot: Bot):
 async def on_shutdown(*args, **kwargs):
     print('Начинаю очищать таблицу messages')
     await delete_messages()
-
-
+    
 
 async def main() -> None:
     bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
